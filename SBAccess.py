@@ -420,7 +420,12 @@ class SBAccess(object):
         return theVals[0]
 
     def GetCurrentSlideId(self):
-        """returns the Slide Id of the active slide
+        """Gets the Slide Id of the active slide
+
+        Parameters
+        ----------
+            none
+
         Returns
         -------
         int
@@ -431,6 +436,35 @@ class SBAccess(object):
         if( theNum != 1):
             raise Exception("GetCurrentSlideId: error")
         return theVals[0]
+
+    def GetOpenSlides(self):
+        """Gets a dictionary of  Slide Id  vs Pathname of all open slides
+
+        Parameters
+        ----------
+            none
+
+        Returns
+        -------
+        dict
+            The dictionary of IDs/SlideName(Pathname)
+        """
+        self.SendCommand('$GetOpenSlides()')
+        theNum,theVals = self.Recv()
+        if( theNum != 1):
+            raise Exception("GetOpenSlides: error")
+        theDict = dict()
+        for id in range(theVals[0]):
+
+            theNum,theVals = self.Recv()
+            if( theNum != 1):
+                raise Exception("GetOpenSlides: error")
+            theId = theVals[0]
+            thePath = self.Recv()
+            theDict[theId]= thePath
+
+        return theDict
+
 
     def SetTargetSlide(self,inSlideId):
         """Sets the target slide for subsequent operations 
@@ -469,6 +503,54 @@ class SBAccess(object):
         if( theNum != 1):
             raise Exception("CreateNewSlide: error")
         return theVals[0]
+
+    def CloseSlide(self,inSlideId,inSaveChanges):
+        """Close a slide
+        Parameters
+        ----------
+        inSlideId : int
+            The Slide Id
+        inSaveChanges
+            If the slide has been modified, save changes?
+
+        Returns
+        -------
+        int
+            True if successful and false if failure (failure to save is most commonly caused by a new file without a pathname)
+        """
+        self.SendCommand('$CloseSlide(SlideId=i4,SaveChanges=i4)')
+        self.SendVal(int(inSlideId),'i4')
+        self.SendVal(int(inSaveChanges),'i4')
+        theNum,theStatus = self.Recv()
+        if( theNum != 1):
+            raise Exception("SaveSlide: invalid statuc")
+
+        return theStatus[0]
+
+    def GetIsSlideModified(self, inSlideId):
+        """Get modified status of slide
+        Parameters
+        ----------
+        inSlideId : int
+            The Slide Id
+
+        Returns
+        -------
+        bool
+            True if file has been modified since last save, false if the file has not been modified
+        int
+            True if successful and false if failure
+        """
+        self.SendCommand('$GetIsSlideModified(SlideId=i4)')
+        self.SendVal(int(inSlideId), 'i4')
+        theNum, theStatus = self.Recv()
+        if (theNum != 1):
+            raise Exception("SaveSlide: invalid status")
+        theNum, theReturn = self.Recv()
+        if (theNum != 1):
+            raise Exception("SaveSlide: invalid return")
+
+        return theStatus[0], theReturn[0]
 
     def SaveSlide(self,inSlideId):
         """Saves a slide
@@ -556,8 +638,6 @@ class SBAccess(object):
         print("GetNumLiveCaptures: ",theVals[0])
 
         return theVals[0]
-
-
 
     def GetNumMasks(self,inCaptureIndex):
         """ Gets the number of masks in an image group
@@ -3355,9 +3435,9 @@ class SBAccess(object):
         Position: int
             The filter position (0-20)
         Arcs: str
-           Comma-separated angles denoting start and stop angle (degrees) pairs. 0-360 is a full circle.
-           45,90,80,360 defines two arc segments: 45-90 and then 180 to 360.
-           Minimum arc length is one degree.
+           Comma-separated angles denoting start and stop angle (0.1 degrees) pairs. 0-3600 is a full circle.
+           450,900,1800,3600 defines two arc segments: 45-90 and then 180 to 360.
+           Minimum arc length is one-tenth degree.
         Slices: str
             Comma-separated list of filters to be concatenated together to create a virtual time-sliced TIRF channel.
             Can include any number of specified TIRF channels (including the current position) and will use the duration
@@ -3404,9 +3484,9 @@ class SBAccess(object):
         Returns
         -------
         Arcs: int
-           arcs
+           arcs (see FocusWindowSetARCSliceTIRFParameters for parameter format)
         Slices: int
-            slices
+            slices (see FocusWindowSetARCSliceTIRFParameters for parameter format)
         int
             Returns success or failure
         """
